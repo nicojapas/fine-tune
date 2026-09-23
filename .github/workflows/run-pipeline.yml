@@ -51,7 +51,7 @@ jobs:
           terminal_states = {"complete", "error", "cancelAcknowledged"}
 
           for _ in range(180):  # up to 3 hours at 60s intervals
-              status = api.kernels_status(kernel).get("status")
+              status = str(api.kernels_status(kernel).status)
               print(f"status: {status}", flush=True)
               if status == "complete":
                   sys.exit(0)

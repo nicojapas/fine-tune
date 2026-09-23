@@ -1,0 +1,11 @@
+torch
+torchvision
+diffusers>=0.27
+transformers
+peft
+torchao>=0.16.0
+safetensors
+huggingface_hub
+numpy
+pillow
+matplotlib

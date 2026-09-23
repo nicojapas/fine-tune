@@ -1,0 +1,77 @@
+name: Run pipeline on Kaggle GPU
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  run-on-kaggle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Kaggle CLI
+        run: pip install kaggle
+
+      - name: Configure Kaggle credentials
+        env:
+          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+          KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
+        run: |
+          mkdir -p ~/.kaggle
+          printf '{"username":"%s","key":"%s"}' "$KAGGLE_USERNAME" "$KAGGLE_KEY" > ~/.kaggle/kaggle.json
+          chmod 600 ~/.kaggle/kaggle.json
+
+      - name: Push kernel to Kaggle (triggers a run)
+        env:
+          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+        run: |
+          sed -i "s/KAGGLE_USERNAME_PLACEHOLDER/${KAGGLE_USERNAME}/" kaggle/kernel-metadata.json
+          kaggle kernels push -p kaggle/
+
+      - name: Wait for kernel run to finish
+        env:
+          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+        run: |
+          python - <<'EOF'
+          import os
+          import sys
+          import time
+
+          from kaggle.api.kaggle_api_extended import KaggleApi
+
+          api = KaggleApi()
+          api.authenticate()
+
+          kernel = f"{os.environ['KAGGLE_USERNAME']}/fine-tune-pipeline"
+          terminal_states = {"complete", "error", "cancelAcknowledged"}
+
+          for _ in range(180):  # up to 3 hours at 60s intervals
+              status = api.kernels_status(kernel).get("status")
+              print(f"status: {status}", flush=True)
+              if status == "complete":
+                  sys.exit(0)
+              if status in terminal_states:
+                  print("Kernel run did not complete successfully.")
+                  sys.exit(1)
+              time.sleep(60)
+
+          print("Timed out waiting for the Kaggle kernel to finish.")
+          sys.exit(1)
+          EOF
+
+      - name: Download kernel output
+        env:
+          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+        run: |
+          kaggle kernels output "${KAGGLE_USERNAME}/fine-tune-pipeline" -p results/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pipeline-results
+          path: results/

@@ -48,14 +48,15 @@ jobs:
           api.authenticate()
 
           kernel = f"{os.environ['KAGGLE_USERNAME']}/fine-tune-pipeline"
-          terminal_states = {"complete", "error", "cancelAcknowledged"}
+          terminal_states = {"COMPLETE", "ERROR", "CANCELACKNOWLEDGED"}
 
           for _ in range(180):  # up to 3 hours at 60s intervals
-              status = str(api.kernels_status(kernel).status)
-              print(f"status: {status}", flush=True)
-              if status == "complete":
+              status = api.kernels_status(kernel).status
+              status_name = status.name if hasattr(status, "name") else str(status).upper()
+              print(f"status: {status_name}", flush=True)
+              if status_name == "COMPLETE":
                   sys.exit(0)
-              if status in terminal_states:
+              if status_name in terminal_states:
                   print("Kernel run did not complete successfully.")
                   sys.exit(1)
               time.sleep(60)
@@ -65,12 +66,14 @@ jobs:
           EOF
 
       - name: Download kernel output
+        if: always()
         env:
           KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
         run: |
           kaggle kernels output "${KAGGLE_USERNAME}/fine-tune-pipeline" -p results/
 
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: pipeline-results
           path: results/

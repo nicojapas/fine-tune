@@ -15,4 +15,4 @@ def load_pipeline(model, device="cuda", dtype=torch.float16):
         pipe = StableDiffusionXLPipeline.from_pretrained(SDXL_MODEL, dtype=dtype, variant="fp16")
     else:
         raise ValueError(f"unknown model: {model}")
-    return pipe.to(device)
+    return pipe.to(device, dtype)
